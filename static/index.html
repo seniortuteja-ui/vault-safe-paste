@@ -50,6 +50,8 @@ textarea{width:100%;min-height:170px;font:15px/1.5 ui-monospace,Menlo,Consolas,m
 .banner.bad svg{color:var(--bad)}
 .banner strong{display:block;font-size:1.05rem}
 .banner p{margin:2px 0 0;color:var(--mute);font-size:.95rem}
+.meta{margin-top:4px;font-size:.93rem}
+.meta b{font-weight:600}
 .evidence{margin:10px 0 0;padding:0;list-style:none}
 .evidence li{background:var(--panel);border-left:4px solid var(--bad);border-radius:4px;padding:6px 10px;margin-top:6px;font:14px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);word-break:break-word}
 .evidence-title{margin-top:10px;font-size:.9rem;font-weight:600;color:var(--ink)}
@@ -169,9 +171,25 @@ function evidenceHtml(e, title){
 function raw(obj){
   return "<details><summary>Raw Clocked response</summary><pre>" + esc(JSON.stringify(obj,null,2)) + "</pre></details>";
 }
-function banner(kind, title, detail, extra){
+const pct = x => typeof x === "number" ? parseFloat((x*100).toFixed(1)) + "%" : null;
+const nice = v => { v = String(v||""); return v ? v.charAt(0).toUpperCase() + v.slice(1) : ""; };
+function metaRow(items){
+  const bits = items.filter(([k,v]) => v);
+  if(!bits.length) return "";
+  return '<div class="meta">' + bits.map(([k,v]) => "<b>" + esc(k) + ":</b> " + esc(v)).join(" \u00b7 ") + "</div>";
+}
+function plainScript(cat, bad){
+  if(!bad) return "No harmful behavior was found in this script.";
+  const c = String(cat||"");
+  if(/remote code|execution|download/i.test(c)) return "This script downloads code from the internet and runs it without checking it first.";
+  if(/evasion|defen|disable|tamper/i.test(c)) return "This script tries to switch off or get around security protection.";
+  if(/exfil|credential|theft/i.test(c)) return "This script appears to collect or send out sensitive data.";
+  if(/persist/i.test(c)) return "This script sets itself up to keep running after a restart.";
+  return "This script behaves in ways that could harm the computer or its data.";
+}
+function banner(kind, title, meta, plain, extra){
   return '<div class="banner ' + (kind==="bad" ? "bad" : "") + '">' + ICON[kind] +
-    '<div><strong>' + esc(title) + '</strong>' + (detail ? "<p>" + esc(detail) + "</p>" : "") + (extra||"") + "</div></div>";
+    '<div><strong>' + esc(title) + '</strong>' + (meta||"") + (plain ? "<p>" + esc(plain) + "</p>" : "") + (extra||"") + "</div></div>";
 }
 
 async function post(url, body){
@@ -203,15 +221,17 @@ $("go").onclick = async () => {
       if(r.blocked){
         gate("g-guard","bad","Blocked");
         gate("g-pii","skip","Skipped: note not trusted");
+        const g = r.guard;
         $("out").innerHTML = banner("bad", "Blocked: hidden instructions found",
+          metaRow([["Category", nice(g.category)]]) + metaRow([["Confidence", pct(g.injection)], ["Severity", nice(g.severity)]]),
           "This note was not masked or passed on, because it tries to give instructions to whatever reads it next.",
-          evidenceHtml(r.guard.evidence, "Flagged by Guard")) + raw(r.guard);
+          evidenceHtml(g.evidence, "Flagged by Guard")) + raw(g);
       } else {
         const masked = r.masked || ""; lastMasked = masked;
         gate("g-guard","ok","Clear: no hidden instructions");
         const n = (masked.match(/<[A-Z_]+>/g) || []).length;
         gate("g-pii","ok", n ? n + " item" + (n>1?"s":"") + " masked" : "Nothing to mask");
-        $("out").innerHTML = banner("ok", "Safe to share", summarize(masked)) +
+        $("out").innerHTML = banner("ok", "Safe to share", "", n ? summarize(masked) : "No hidden instructions, no personal data found.") +
           '<div class="cols"><div class="box"><div class="boxhead"><h3>Original</h3></div>' + esc(text) + '</div>' +
           '<div class="box safe"><div class="boxhead"><h3>Safe to share</h3><button id="copy" type="button">Copy safe text</button></div>' +
           highlightMasked(masked) + '</div></div>' + raw({guard:r.guard, pii:r.pii});
@@ -223,9 +243,12 @@ $("go").onclick = async () => {
       const v = String(r.verdict||"").toLowerCase();
       const bad = v !== "benign" && v !== "safe";
       gate("g-script", bad ? "bad" : "ok", "Verdict: " + r.verdict);
+      const conf = typeof r.confidence === "number" ? r.confidence
+        : (r.categories && typeof r.categories[r.category] === "number" ? r.categories[r.category] : null);
       $("out").innerHTML = banner(bad ? "bad" : "ok",
-        bad ? "Do not run this script" : "No harmful behavior found",
-        "Verdict: " + r.verdict,
+        bad ? "Do not run this script" : "Safe to run",
+        metaRow([["Verdict", nice(r.verdict)], ["Confidence", pct(conf)]]) + metaRow([["Category", nice(r.category)], ["Severity", nice(r.severity)]]),
+        plainScript(r.category, bad),
         bad ? evidenceHtml(r.evidence, "What Inspect found") : "") + raw(r);
     }
     $("status").textContent = "";
