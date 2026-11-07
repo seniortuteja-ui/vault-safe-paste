@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vault Safe Paste</title>
+<style>
+:root{--bg:#eef2f1;--panel:#fff;--ink:#1b2a2f;--mute:#5b6b70;--line:#cfd9d7;
+--ok:#0f766e;--bad:#b42318;--mask:#f6d36b;--font:"Avenir Next","Segoe UI",system-ui,sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#16201f;--panel:#1f2c2b;--ink:#e6efed;--mute:#9db1ad;--line:#334644;--ok:#4fd1c0;--bad:#ff8a7a;--mask:#6b5a12}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--font)}
+main{max-width:960px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:1.7rem;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 20px;max-width:60ch}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+button{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 14px;cursor:pointer}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--ok);outline-offset:2px}
+.tab[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.go{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:600}
+.go:disabled{opacity:.6;cursor:wait}
+textarea{width:100%;min-height:170px;font:15px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.samples{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.samples button{font-size:.9rem;padding:5px 10px}
+.row{display:flex;gap:12px;align-items:center;margin:12px 0}
+.banner{padding:12px 14px;border-radius:8px;border-left:6px solid var(--ok);background:var(--panel);margin:16px 0 8px;font-weight:600}
+.banner.bad{border-color:var(--bad)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:700px){.cols{grid-template-columns:1fr}}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-word}
+.box h3{margin:0 0 6px;font-size:.95rem;color:var(--mute);font-weight:600}
+mark{background:var(--mask);color:inherit;padding:0 3px;border-radius:3px}
+details{margin-top:12px;color:var(--mute)}
+pre{overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:.85rem}
+.err{color:var(--bad);font-weight:600}
+.hide{display:none}
+</style>
+</head>
+<body>
+<main>
+<h1>Vault Safe Paste</h1>
+<p class="sub">Check CRM notes and scripts before they leave your hands. Notes are screened for hidden instructions, then personal data is masked. Scripts are classified before anyone runs them. Demo data is synthetic.</p>
+
+<div class="tabs" role="tablist">
+  <button class="tab" role="tab" id="t-note" aria-selected="true">Scan a note</button>
+  <button class="tab" role="tab" id="t-script" aria-selected="false">Check a script</button>
+</div>
+
+<div class="samples" id="samples" aria-label="Sample inputs"></div>
+<textarea id="input" aria-label="Text to check" placeholder="Paste a CRM note here"></textarea>
+<div class="row"><button class="go" id="go">Scan note</button><span id="status" aria-live="polite"></span></div>
+<div id="out"></div>
+</main>
+
+<script>
+let mode = "note", data = {notes: [], scripts: []};
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function setMode(m){
+  mode = m;
+  $("t-note").setAttribute("aria-selected", m==="note");
+  $("t-script").setAttribute("aria-selected", m==="script");
+  $("go").textContent = m==="note" ? "Scan note" : "Check script";
+  $("input").placeholder = m==="note" ? "Paste a CRM note here" : "Paste a script here";
+  $("input").value = ""; $("out").innerHTML = ""; $("status").textContent = "";
+  const list = m==="note" ? data.notes : data.scripts;
+  $("samples").innerHTML = "";
+  list.forEach(s => {
+    const b = document.createElement("button");
+    b.textContent = s.label;
+    b.onclick = () => { $("input").value = s.text; };
+    $("samples").appendChild(b);
+  });
+}
+$("t-note").onclick = () => setMode("note");
+$("t-script").onclick = () => setMode("script");
+
+// Mark the masked placeholders in the output so changes are visible.
+function highlightMasked(masked, original){
+  const parts = esc(masked).split(/(\[[A-Z_ ]+\]|&lt;[A-Z_ ]+&gt;)/g);
+  return parts.map(p => /^(\[[A-Z_ ]+\]|&lt;[A-Z_ ]+&gt;)$/.test(p) ? `<mark>${p}</mark>` : p).join("");
+}
+
+function raw(obj){
+  return `<details><summary>Raw Clocked response</summary><pre>${esc(JSON.stringify(obj,null,2))}</pre></details>`;
+}
+
+async function post(url, body){
+  const r = await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  const j = await r.json();
+  if(!r.ok) throw new Error(j.detail || "Request failed");
+  return j;
+}
+
+$("go").onclick = async () => {
+  const text = $("input").value.trim();
+  if(!text){ $("status").textContent = "Paste some text first."; return; }
+  $("go").disabled = true; $("status").textContent = "Checking..."; $("out").innerHTML = "";
+  try{
+    if(mode==="note"){
+      const r = await post("/api/scan", {text});
+      if(r.blocked){
+        $("out").innerHTML = `<div class="banner bad">Blocked: this note looks like it contains hidden instructions. Nothing was masked or passed on.</div>${raw(r.guard)}`;
+      } else {
+        $("out").innerHTML = `<div class="banner">No hidden instructions found. Personal data has been masked.</div>
+          <div class="cols"><div class="box"><h3>Original</h3>${esc(text)}</div>
+          <div class="box"><h3>Safe to share</h3>${highlightMasked(r.masked || "", text)}</div></div>${raw({guard:r.guard, pii:r.pii})}`;
+      }
+    } else {
+      const r = await post("/api/inspect", {script:text});
+      const bad = String(r.verdict||"").toLowerCase() !== "benign" && String(r.verdict||"").toLowerCase() !== "safe";
+      $("out").innerHTML = `<div class="banner ${bad?"bad":""}">Script verdict: ${esc(String(r.verdict))}</div>${raw(r)}`;
+    }
+    $("status").textContent = "";
+  }catch(e){
+    $("status").innerHTML = `<span class="err">${esc(e.message)}</span>`;
+  }finally{ $("go").disabled = false; }
+};
+
+fetch("/api/samples").then(r=>r.json()).then(d=>{data=d; setMode("note");});
+</script>
+</body>
+</html>
