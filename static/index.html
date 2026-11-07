@@ -83,6 +83,17 @@ function highlightMasked(masked, original){
 }
 
 function raw(obj){
+  function summarize(masked){
+  const found = masked.match(/<[A-Z_]+>/g) || [];
+  if(!found.length) return "No personal data found.";
+  const counts = {};
+  found.forEach(t => {
+    const k = t.slice(1,-1).toLowerCase().replace(/_/g," ");
+    counts[k] = (counts[k]||0) + 1;
+  });
+  const parts = Object.entries(counts).map(([k,v]) => v + " " + k);
+  return found.length + " item" + (found.length>1 ? "s" : "") + " masked: " + parts.join(", ");
+}
   return `<details><summary>Raw Clocked response</summary><pre>${esc(JSON.stringify(obj,null,2))}</pre></details>`;
 }
 
@@ -103,7 +114,7 @@ $("go").onclick = async () => {
       if(r.blocked){
         $("out").innerHTML = `<div class="banner bad">Blocked: this note looks like it contains hidden instructions. Nothing was masked or passed on.</div>${raw(r.guard)}`;
       } else {
-        $("out").innerHTML = `<div class="banner">No hidden instructions found. Personal data has been masked.</div>
+        $("out").innerHTML = `<div class="banner">No hidden instructions found. ${esc(summarize(r.masked || ""))}</div>
           <div class="cols"><div class="box"><h3>Original</h3>${esc(text)}</div>
           <div class="box"><h3>Safe to share</h3>${highlightMasked(r.masked || "", text)}</div></div>${raw({guard:r.guard, pii:r.pii})}`;
       }
