@@ -4,41 +4,80 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Vault Safe Paste</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%A1%EF%B8%8F%3C/text%3E%3C/svg%3E">
 <style>
-:root{--bg:#eef2f1;--panel:#fff;--ink:#1b2a2f;--mute:#5b6b70;--line:#cfd9d7;
---ok:#0f766e;--bad:#b42318;--mask:#f6d36b;--font:"Avenir Next","Segoe UI",system-ui,sans-serif}
-@media(prefers-color-scheme:dark){:root{--bg:#16201f;--panel:#1f2c2b;--ink:#e6efed;--mute:#9db1ad;--line:#334644;--ok:#4fd1c0;--bad:#ff8a7a;--mask:#6b5a12}}
+:root{--bg:#edf1f4;--panel:#fff;--ink:#12212b;--mute:#52656f;--line:#c9d4da;
+--ok:#0b6e6e;--okbg:#dff3f1;--bad:#b3261e;--badbg:#fbe4e1;--mask:#f6d36b;--idle:#9fb0b8;
+--serif:"Iowan Old Style",Palatino,"Palatino Linotype",Georgia,serif;
+--sans:"Avenir Next","Segoe UI",system-ui,sans-serif}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1a20;--panel:#17252d;--ink:#e5eef2;--mute:#9db1ba;--line:#2c414c;
+--ok:#4fd1c0;--okbg:#123a38;--bad:#ff8f80;--badbg:#3d1f1c;--mask:#6b5a12;--idle:#5c717b}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--font)}
-main{max-width:960px;margin:0 auto;padding:20px 16px 48px}
-h1{font-size:1.7rem;margin:0 0 4px}
-.sub{color:var(--mute);margin:0 0 20px;max-width:60ch}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans)}
+main{max-width:980px;margin:0 auto;padding:28px 16px 56px}
+h1{font:700 2.2rem/1.1 var(--serif);margin:0 0 8px;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 22px;max-width:62ch}
+
+/* the three checkpoints a note or script passes through */
+.gates{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 26px;padding:0;list-style:none}
+@media(max-width:720px){.gates{grid-template-columns:1fr}}
+.gate{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--idle);border-radius:10px;padding:12px 14px;transition:border-color .25s}
+.gate[data-state=ok]{border-top-color:var(--ok)}
+.gate[data-state=bad]{border-top-color:var(--bad)}
+.gate[data-state=skip]{opacity:.65}
+.gate b{display:block;font-size:1.05rem}
+.gate .ep{color:var(--mute);font-size:.85rem}
+.gate .st{display:block;margin-top:6px;font-size:.92rem;font-weight:600;color:var(--mute)}
+.gate[data-state=ok] .st{color:var(--ok)}
+.gate[data-state=bad] .st{color:var(--bad)}
+
 .tabs{display:flex;gap:8px;margin-bottom:12px}
 button{font:inherit;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 14px;cursor:pointer}
+button:hover{border-color:var(--ok)}
 button:focus-visible,textarea:focus-visible{outline:3px solid var(--ok);outline-offset:2px}
 .tab[aria-selected=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.go{background:var(--ok);color:#fff;border-color:var(--ok);font-weight:600}
+.go{background:var(--ok);color:var(--bg);border-color:var(--ok);font-weight:700;padding:10px 20px}
 .go:disabled{opacity:.6;cursor:wait}
-textarea{width:100%;min-height:170px;font:15px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:12px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
-.samples{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.samples{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px;align-items:center}
+.samples span{color:var(--mute);font-size:.9rem}
 .samples button{font-size:.9rem;padding:5px 10px}
+textarea{width:100%;min-height:170px;font:15px/1.5 ui-monospace,Menlo,Consolas,monospace;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
 .row{display:flex;gap:12px;align-items:center;margin:12px 0}
-.banner{padding:12px 14px;border-radius:8px;border-left:6px solid var(--ok);background:var(--panel);margin:16px 0 8px;font-weight:600}
-.banner.bad{border-color:var(--bad)}
+
+.banner{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:10px;background:var(--okbg);border:1px solid var(--ok);margin:18px 0 10px}
+.banner.bad{background:var(--badbg);border-color:var(--bad)}
+.banner svg{flex:none;width:26px;height:26px;margin-top:1px;color:var(--ok)}
+.banner.bad svg{color:var(--bad)}
+.banner strong{display:block;font-size:1.05rem}
+.banner p{margin:2px 0 0;color:var(--mute);font-size:.95rem}
+.evidence{margin:10px 0 0;padding:0;list-style:none}
+.evidence li{background:var(--panel);border-left:4px solid var(--bad);border-radius:4px;padding:6px 10px;margin-top:6px;font:14px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--ink);word-break:break-word}
+.evidence-title{margin-top:10px;font-size:.9rem;font-weight:600;color:var(--ink)}
+
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:700px){.cols{grid-template-columns:1fr}}
-.box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-word}
-.box h3{margin:0 0 6px;font-size:.95rem;color:var(--mute);font-weight:600}
+@media(max-width:720px){.cols{grid-template-columns:1fr}}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;white-space:pre-wrap;word-break:break-word}
+.box.safe{border-color:var(--ok)}
+.boxhead{display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;gap:8px}
+.boxhead h3{margin:0;font-size:.95rem;color:var(--mute);font-weight:600}
+.boxhead button{font-size:.85rem;padding:3px 10px}
 mark{background:var(--mask);color:inherit;padding:0 3px;border-radius:3px}
 details{margin-top:12px;color:var(--mute)}
 pre{overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:.85rem}
 .err{color:var(--bad);font-weight:600}
+@media(prefers-reduced-motion:reduce){.gate{transition:none}}
 </style>
 </head>
 <body>
 <main>
 <h1>Vault Safe Paste</h1>
-<p class="sub">Check CRM notes and scripts before they leave your hands. Notes are screened for hidden instructions, then personal data is masked. Scripts are classified before anyone runs them. Demo data is synthetic.</p>
+<p class="sub">Check CRM notes and scripts before they leave your hands. Every note passes two checkpoints, hidden-instruction screening and personal-data masking. Every script is classified before anyone runs it. Demo data is synthetic.</p>
+
+<ul class="gates" aria-label="Checkpoints">
+  <li class="gate" id="g-guard" data-state="idle"><b>Guard</b><span class="ep">Clocked injection</span><span class="st">Waiting for a note</span></li>
+  <li class="gate" id="g-pii" data-state="idle"><b>Protect</b><span class="ep">Clocked PII</span><span class="st">Waiting for a note</span></li>
+  <li class="gate" id="g-script" data-state="idle"><b>Inspect</b><span class="ep">Clocked script</span><span class="st">Waiting for a script</span></li>
+</ul>
 
 <div class="tabs" role="tablist">
   <button class="tab" role="tab" id="t-note" aria-selected="true">Scan a note</button>
@@ -52,9 +91,23 @@ pre{overflow:auto;background:var(--panel);border:1px solid var(--line);border-ra
 </main>
 
 <script>
-let mode = "note", data = {notes: [], scripts: []};
+let mode = "note", data = {notes: [], scripts: []}, lastMasked = "";
 const $ = id => document.getElementById(id);
-const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const ICON = {
+  ok:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l3 3 5-6"/></svg>',
+  bad:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M9 9l6 6M15 9l-6 6"/></svg>'
+};
+
+function gate(id, state, text){
+  const g = $(id); g.dataset.state = state; g.querySelector(".st").textContent = text;
+}
+function resetGates(){
+  gate("g-guard","idle", mode==="note" ? "Ready" : "Not used for scripts");
+  gate("g-pii","idle", mode==="note" ? "Ready" : "Not used for scripts");
+  gate("g-script","idle", mode==="script" ? "Ready" : "Not used for notes");
+}
 
 function setMode(m){
   mode = m;
@@ -63,8 +116,9 @@ function setMode(m){
   $("go").textContent = m==="note" ? "Scan note" : "Check script";
   $("input").placeholder = m==="note" ? "Paste a CRM note here" : "Paste a script here";
   $("input").value = ""; $("out").innerHTML = ""; $("status").textContent = "";
+  resetGates();
   const list = m==="note" ? data.notes : data.scripts;
-  $("samples").innerHTML = "";
+  $("samples").innerHTML = "<span>Try a sample:</span>";
   list.forEach(s => {
     const b = document.createElement("button");
     b.textContent = s.label;
@@ -75,7 +129,7 @@ function setMode(m){
 $("t-note").onclick = () => setMode("note");
 $("t-script").onclick = () => setMode("script");
 
-// Mark the masked placeholders in the output so changes are visible.
+// Highlight the placeholders Clocked put in the masked text.
 function highlightMasked(masked){
   const parts = esc(masked).split(/(\[[A-Z_ ]+\]|&lt;[A-Z_ ]+&gt;)/g);
   return parts.map(p => /^(\[[A-Z_ ]+\]|&lt;[A-Z_ ]+&gt;)$/.test(p) ? "<mark>" + p + "</mark>" : p).join("");
@@ -94,8 +148,30 @@ function summarize(masked){
   return found.length + " item" + (found.length>1 ? "s" : "") + " masked: " + parts.join(", ");
 }
 
+// Evidence can come back as text, a list, or objects; flatten it to readable lines.
+function evidenceLines(e){
+  if(!e) return [];
+  if(typeof e === "string") return [e];
+  if(Array.isArray(e)) return e.flatMap(evidenceLines);
+  if(typeof e === "object"){
+    const t = e.text || e.quote || e.span || e.excerpt || e.snippet || e.reason || e.explanation;
+    return t ? [String(t)] : [JSON.stringify(e)];
+  }
+  return [String(e)];
+}
+function evidenceHtml(e, title){
+  const lines = evidenceLines(e).slice(0,6);
+  if(!lines.length) return "";
+  return '<div class="evidence-title">' + esc(title) + '</div><ul class="evidence">' +
+    lines.map(l => "<li>" + esc(l) + "</li>").join("") + "</ul>";
+}
+
 function raw(obj){
   return "<details><summary>Raw Clocked response</summary><pre>" + esc(JSON.stringify(obj,null,2)) + "</pre></details>";
+}
+function banner(kind, title, detail, extra){
+  return '<div class="banner ' + (kind==="bad" ? "bad" : "") + '">' + ICON[kind] +
+    '<div><strong>' + esc(title) + '</strong>' + (detail ? "<p>" + esc(detail) + "</p>" : "") + (extra||"") + "</div></div>";
 }
 
 async function post(url, body){
@@ -105,30 +181,56 @@ async function post(url, body){
   return j;
 }
 
+async function copySafe(btn){
+  try{
+    await navigator.clipboard.writeText(lastMasked);
+    btn.textContent = "Copied";
+  }catch(e){
+    btn.textContent = "Copy failed";
+  }
+  setTimeout(() => { btn.textContent = "Copy safe text"; }, 1800);
+}
+
 $("go").onclick = async () => {
   const text = $("input").value.trim();
   if(!text){ $("status").textContent = "Paste some text first."; return; }
   $("go").disabled = true; $("status").textContent = "Checking..."; $("out").innerHTML = "";
+  resetGates();
   try{
     if(mode==="note"){
+      gate("g-guard","idle","Checking...");
       const r = await post("/api/scan", {text});
       if(r.blocked){
-        $("out").innerHTML = '<div class="banner bad">Blocked: this note looks like it contains hidden instructions. Nothing was masked or passed on.</div>' + raw(r.guard);
+        gate("g-guard","bad","Blocked");
+        gate("g-pii","skip","Skipped: note not trusted");
+        $("out").innerHTML = banner("bad", "Blocked: hidden instructions found",
+          "This note was not masked or passed on, because it tries to give instructions to whatever reads it next.",
+          evidenceHtml(r.guard.evidence, "Flagged by Guard")) + raw(r.guard);
       } else {
-        const masked = r.masked || "";
-        $("out").innerHTML = '<div class="banner">No hidden instructions found. ' + esc(summarize(masked)) + '</div>' +
-          '<div class="cols"><div class="box"><h3>Original</h3>' + esc(text) + '</div>' +
-          '<div class="box"><h3>Safe to share</h3>' + highlightMasked(masked) + '</div></div>' +
-          raw({guard:r.guard, pii:r.pii});
+        const masked = r.masked || ""; lastMasked = masked;
+        gate("g-guard","ok","Clear: no hidden instructions");
+        const n = (masked.match(/<[A-Z_]+>/g) || []).length;
+        gate("g-pii","ok", n ? n + " item" + (n>1?"s":"") + " masked" : "Nothing to mask");
+        $("out").innerHTML = banner("ok", "Safe to share", summarize(masked)) +
+          '<div class="cols"><div class="box"><div class="boxhead"><h3>Original</h3></div>' + esc(text) + '</div>' +
+          '<div class="box safe"><div class="boxhead"><h3>Safe to share</h3><button id="copy" type="button">Copy safe text</button></div>' +
+          highlightMasked(masked) + '</div></div>' + raw({guard:r.guard, pii:r.pii});
+        $("copy").onclick = e => copySafe(e.currentTarget);
       }
     } else {
+      gate("g-script","idle","Checking...");
       const r = await post("/api/inspect", {script:text});
       const v = String(r.verdict||"").toLowerCase();
       const bad = v !== "benign" && v !== "safe";
-      $("out").innerHTML = '<div class="banner ' + (bad ? "bad" : "") + '">Script verdict: ' + esc(String(r.verdict)) + '</div>' + raw(r);
+      gate("g-script", bad ? "bad" : "ok", "Verdict: " + r.verdict);
+      $("out").innerHTML = banner(bad ? "bad" : "ok",
+        bad ? "Do not run this script" : "No harmful behavior found",
+        "Verdict: " + r.verdict,
+        bad ? evidenceHtml(r.evidence, "What Inspect found") : "") + raw(r);
     }
     $("status").textContent = "";
   }catch(e){
+    resetGates();
     $("status").innerHTML = '<span class="err">' + esc(e.message) + '</span>';
   }finally{ $("go").disabled = false; }
 };
