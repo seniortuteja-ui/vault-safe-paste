@@ -33,7 +33,6 @@ mark{background:var(--mask);color:inherit;padding:0 3px;border-radius:3px}
 details{margin-top:12px;color:var(--mute)}
 pre{overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:.85rem}
 .err{color:var(--bad);font-weight:600}
-.hide{display:none}
 </style>
 </head>
 <body>
@@ -77,13 +76,13 @@ $("t-note").onclick = () => setMode("note");
 $("t-script").onclick = () => setMode("script");
 
 // Mark the masked placeholders in the output so changes are visible.
-function highlightMasked(masked, original){
+function highlightMasked(masked){
   const parts = esc(masked).split(/(\[[A-Z_ ]+\]|&lt;[A-Z_ ]+&gt;)/g);
-  return parts.map(p => /^(\[[A-Z_ ]+\]|&lt;[A-Z_ ]+&gt;)$/.test(p) ? `<mark>${p}</mark>` : p).join("");
+  return parts.map(p => /^(\[[A-Z_ ]+\]|&lt;[A-Z_ ]+&gt;)$/.test(p) ? "<mark>" + p + "</mark>" : p).join("");
 }
 
-function raw(obj){
-  function summarize(masked){
+// Count placeholders like <PERSON> and describe them in one line.
+function summarize(masked){
   const found = masked.match(/<[A-Z_]+>/g) || [];
   if(!found.length) return "No personal data found.";
   const counts = {};
@@ -94,7 +93,9 @@ function raw(obj){
   const parts = Object.entries(counts).map(([k,v]) => v + " " + k);
   return found.length + " item" + (found.length>1 ? "s" : "") + " masked: " + parts.join(", ");
 }
-  return `<details><summary>Raw Clocked response</summary><pre>${esc(JSON.stringify(obj,null,2))}</pre></details>`;
+
+function raw(obj){
+  return "<details><summary>Raw Clocked response</summary><pre>" + esc(JSON.stringify(obj,null,2)) + "</pre></details>";
 }
 
 async function post(url, body){
@@ -112,20 +113,23 @@ $("go").onclick = async () => {
     if(mode==="note"){
       const r = await post("/api/scan", {text});
       if(r.blocked){
-        $("out").innerHTML = `<div class="banner bad">Blocked: this note looks like it contains hidden instructions. Nothing was masked or passed on.</div>${raw(r.guard)}`;
+        $("out").innerHTML = '<div class="banner bad">Blocked: this note looks like it contains hidden instructions. Nothing was masked or passed on.</div>' + raw(r.guard);
       } else {
-        $("out").innerHTML = `<div class="banner">No hidden instructions found. ${esc(summarize(r.masked || ""))}</div>
-          <div class="cols"><div class="box"><h3>Original</h3>${esc(text)}</div>
-          <div class="box"><h3>Safe to share</h3>${highlightMasked(r.masked || "", text)}</div></div>${raw({guard:r.guard, pii:r.pii})}`;
+        const masked = r.masked || "";
+        $("out").innerHTML = '<div class="banner">No hidden instructions found. ' + esc(summarize(masked)) + '</div>' +
+          '<div class="cols"><div class="box"><h3>Original</h3>' + esc(text) + '</div>' +
+          '<div class="box"><h3>Safe to share</h3>' + highlightMasked(masked) + '</div></div>' +
+          raw({guard:r.guard, pii:r.pii});
       }
     } else {
       const r = await post("/api/inspect", {script:text});
-      const bad = String(r.verdict||"").toLowerCase() !== "benign" && String(r.verdict||"").toLowerCase() !== "safe";
-      $("out").innerHTML = `<div class="banner ${bad?"bad":""}">Script verdict: ${esc(String(r.verdict))}</div>${raw(r)}`;
+      const v = String(r.verdict||"").toLowerCase();
+      const bad = v !== "benign" && v !== "safe";
+      $("out").innerHTML = '<div class="banner ' + (bad ? "bad" : "") + '">Script verdict: ' + esc(String(r.verdict)) + '</div>' + raw(r);
     }
     $("status").textContent = "";
   }catch(e){
-    $("status").innerHTML = `<span class="err">${esc(e.message)}</span>`;
+    $("status").innerHTML = '<span class="err">' + esc(e.message) + '</span>';
   }finally{ $("go").disabled = false; }
 };
 
