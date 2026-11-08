@@ -40,7 +40,8 @@ def fail(e: Exception):
 def scan(n: Note):
     """Guard first (fail closed), then Protect."""
     try:
-        guard = client().injection(text=n.text, source="user", evidence=True)
+        # A pasted CRM note is retrieved content, not a direct user message.
+        guard = client().injection(text=n.text, source="content", evidence=True)
         # Anything other than a benign verdict is treated as unsafe.
         if guard.get("verdict") != "benign":
             return {"blocked": True, "guard": dict(guard)}
