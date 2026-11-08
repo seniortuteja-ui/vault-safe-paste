@@ -160,7 +160,7 @@ function evidenceItems(e){
   if(typeof e === "string") return [{text:e}];
   if(Array.isArray(e)) return e.flatMap(evidenceItems);
   if(typeof e === "object"){
-    const t = e.quote || e.text || e.span || e.excerpt || e.snippet || e.reason || e.explanation;
+    const t = e.quote || e.line || e.text || e.span || e.excerpt || e.snippet || e.reason || e.explanation;
     return [{text: t ? String(t) : JSON.stringify(e), conf: typeof e.confidence === "number" ? e.confidence : null}];
   }
   return [{text:String(e)}];
