@@ -7,11 +7,11 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9B%A1%EF%B8%8F%3C/text%3E%3C/svg%3E">
 <style>
 :root{--bg:#edf1f4;--panel:#fff;--ink:#12212b;--mute:#52656f;--line:#c9d4da;
---ok:#0b6e6e;--okbg:#dff3f1;--bad:#b3261e;--badbg:#fbe4e1;--mask:#f6d36b;--idle:#9fb0b8;
+--ok:#0b6e6e;--okbg:#dff3f1;--bad:#b3261e;--badbg:#fbe4e1;--flag:#f8c3bb;--mask:#f6d36b;--idle:#9fb0b8;
 --serif:"Iowan Old Style",Palatino,"Palatino Linotype",Georgia,serif;
 --sans:"Avenir Next","Segoe UI",system-ui,sans-serif}
 @media(prefers-color-scheme:dark){:root{--bg:#0f1a20;--panel:#17252d;--ink:#e5eef2;--mute:#9db1ba;--line:#2c414c;
---ok:#4fd1c0;--okbg:#123a38;--bad:#ff8f80;--badbg:#3d1f1c;--mask:#6b5a12;--idle:#5c717b}}
+--ok:#4fd1c0;--okbg:#123a38;--bad:#ff8f80;--badbg:#3d1f1c;--flag:#6e2a24;--mask:#6b5a12;--idle:#5c717b}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans)}
 main{max-width:980px;margin:0 auto;padding:28px 16px 56px}
@@ -67,6 +67,10 @@ mark{background:var(--mask);color:inherit;padding:0 3px;border-radius:3px}
 details{margin-top:12px;color:var(--mute)}
 pre{overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:.85rem}
 .err{color:var(--bad);font-weight:600}
+.conf{color:var(--mute);font-family:var(--sans);font-size:.85rem;margin-left:6px}
+mark.flag{background:var(--flag);color:inherit;border-radius:3px;padding:0 2px;box-shadow:inset 0 -2px 0 var(--bad)}
+.box.code{font:14px/1.5 ui-monospace,Menlo,Consolas,monospace}
+.box+.box,.banner+.box,.evidence+.box{margin-top:10px}
 @media(prefers-reduced-motion:reduce){.gate{transition:none}}
 </style>
 </head>
@@ -150,22 +154,43 @@ function summarize(masked){
   return found.length + " item" + (found.length>1 ? "s" : "") + " masked: " + parts.join(", ");
 }
 
-// Evidence can come back as text, a list, or objects; flatten it to readable lines.
-function evidenceLines(e){
+// Evidence items carry a quote, character offsets and a confidence.
+function evidenceItems(e){
   if(!e) return [];
-  if(typeof e === "string") return [e];
-  if(Array.isArray(e)) return e.flatMap(evidenceLines);
+  if(typeof e === "string") return [{text:e}];
+  if(Array.isArray(e)) return e.flatMap(evidenceItems);
   if(typeof e === "object"){
-    const t = e.text || e.quote || e.span || e.excerpt || e.snippet || e.reason || e.explanation;
-    return t ? [String(t)] : [JSON.stringify(e)];
+    const t = e.quote || e.text || e.span || e.excerpt || e.snippet || e.reason || e.explanation;
+    return [{text: t ? String(t) : JSON.stringify(e), conf: typeof e.confidence === "number" ? e.confidence : null}];
   }
-  return [String(e)];
+  return [{text:String(e)}];
 }
 function evidenceHtml(e, title){
-  const lines = evidenceLines(e).slice(0,6);
-  if(!lines.length) return "";
+  const items = evidenceItems(e).slice(0,6);
+  if(!items.length) return "";
   return '<div class="evidence-title">' + esc(title) + '</div><ul class="evidence">' +
-    lines.map(l => "<li>" + esc(l) + "</li>").join("") + "</ul>";
+    items.map(i => "<li>" + esc(i.text) + (i.conf !== null ? '<span class="conf">' + pct(i.conf) + " confidence</span>" : "") + "</li>").join("") + "</ul>";
+}
+// Offsets count Unicode characters, so slice by code point, not by UTF-16 unit.
+function highlightEvidence(text, evidence){
+  const chars = Array.from(text);
+  const spans = (Array.isArray(evidence) ? evidence : [])
+    .filter(x => x && Number.isInteger(x.start) && Number.isInteger(x.end) && x.end > x.start)
+    .sort((p, q) => p.start - q.start);
+  if(!spans.length) return null;
+  let out = "", last = 0;
+  for(const x of spans){
+    const start = Math.max(x.start, last), end = Math.min(x.end, chars.length);
+    if(end <= start) continue;
+    out += esc(chars.slice(last, start).join(""));
+    out += '<mark class="flag">' + esc(chars.slice(start, end).join("")) + "</mark>";
+    last = end;
+  }
+  return out + esc(chars.slice(last).join(""));
+}
+function markedBox(title, text, evidence, cls){
+  const hl = highlightEvidence(text, evidence);
+  return hl ? '<div class="box ' + (cls||"") + '"><div class="boxhead"><h3>' + esc(title) + "</h3></div>" + hl + "</div>" : "";
 }
 
 function raw(obj){
@@ -225,7 +250,7 @@ $("go").onclick = async () => {
         $("out").innerHTML = banner("bad", "Blocked: hidden instructions found",
           metaRow([["Category", nice(g.category)]]) + metaRow([["Confidence", pct(g.injection)], ["Severity", nice(g.severity)]]),
           "This note was not masked or passed on, because it tries to give instructions to whatever reads it next.",
-          evidenceHtml(g.evidence, "Flagged by Guard")) + raw(g);
+          evidenceHtml(g.evidence, "Flagged by Guard")) + markedBox("Your note, with the flagged passage marked", text, g.evidence) + raw(g);
       } else {
         const masked = r.masked || ""; lastMasked = masked;
         gate("g-guard","ok","Clear: no hidden instructions");
@@ -249,7 +274,7 @@ $("go").onclick = async () => {
         bad ? "Do not run this script" : "Safe to run",
         metaRow([["Verdict", nice(r.verdict)], ["Confidence", pct(conf)]]) + metaRow([["Category", nice(r.category)], ["Severity", nice(r.severity)]]),
         plainScript(r.category, bad),
-        bad ? evidenceHtml(r.evidence, "What Inspect found") : "") + raw(r);
+        bad ? evidenceHtml(r.evidence, "What Inspect found") : "") + (bad ? markedBox("Script, with flagged lines marked", text, r.evidence, "code") : "") + raw(r);
     }
     $("status").textContent = "";
   }catch(e){
