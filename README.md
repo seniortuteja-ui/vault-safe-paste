@@ -3,6 +3,7 @@
 Built for the Clocked Build Challenge (Oct 21 – Nov 10, 2026) by Shobhit Tuteja, with AI assistance.
 
 **Live demo:** https://vault-safe-paste.onrender.com
+Demo link : https://drive.google.com/file/d/1F03dy4NTLgJuYES8lP9DF2UzwM2S5qxX/view?usp=drive_link
 The demo runs on a free instance, so the first load can take about 50 seconds to wake up.
 
 Vault Safe Paste checks CRM notes and scripts before they are shared, pasted into an AI tool, or run. People who work with CRM data copy notes into emails, chats and AI assistants all the time. Those notes can contain personal data, and they can contain hidden instructions aimed at whatever reads them next. This app puts three checkpoints in front of that step, using three Clocked endpoints.
